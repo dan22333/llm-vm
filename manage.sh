@@ -58,9 +58,11 @@ deploy() {
     echo "Granting required roles to service account..."
     
     REQUIRED_ROLES=(
-        "roles/artifactregistry.reader"      # Pull container images
-        "roles/storage.objectViewer"         # Read from bucket
-        "roles/storage.objectCreator"        # Write new models to bucket
+    "roles/artifactregistry.reader"      # Pull container images
+    "roles/storage.objectViewer"         # Read from bucket
+    "roles/storage.objectCreator"        # Write new models to bucket
+    "roles/storage.objectViewer"         # View bucket objects
+    "roles/storage.legacyBucketReader"   # List bucket contents
     )
 
     for role in "${REQUIRED_ROLES[@]}"; do
