@@ -1,0 +1,88 @@
+#cloud-config
+
+write_files:
+  # Environment file for Docker configuration
+  - path: /etc/profile.d/docker-config.sh
+    permissions: 0644
+    owner: root
+    content: |
+      export DOCKER_CONFIG=/var/lib/docker/config
+
+  - path: /etc/systemd/system.conf.d/docker-env.conf
+    permissions: 0644
+    owner: root
+    content: |
+      [Manager]
+      DefaultEnvironment="DOCKER_CONFIG=/var/lib/docker/config"
+
+  - path: /var/lib/toolbox/service/install-gpu.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Install GPU drivers
+      Wants=gcr-online.target docker.socket
+      After=gcr-online.target docker.socket
+
+      [Service]
+      User=root
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/usr/bin/cos-extensions install gpu
+      StandardOutput=journal+console
+      StandardError=journal+console
+
+  - path: /var/lib/toolbox/service/llm-service.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Run LLM container
+      Requires=install-gpu.service docker.service
+      After=install-gpu.service docker.service
+
+      [Service]
+      User=root
+      Type=simple
+      Environment="DOCKER_CONFIG=/var/lib/docker/config"
+      EnvironmentFile=/var/lib/toolbox/env/llm.env
+      ExecStart=/bin/bash -c '/usr/bin/docker run --rm \
+        --volume /var/lib/nvidia/lib64:/usr/local/nvidia/lib64 \
+        --volume /var/lib/nvidia/bin:/usr/local/nvidia/bin \
+        --device /dev/nvidia0:/dev/nvidia0 \
+        --device /dev/nvidia-uvm:/dev/nvidia-uvm \
+        --device /dev/nvidiactl:/dev/nvidiactl \
+        --volume /mnt/disks/model-cache:/mnt/disks/model-cache \
+        -p "${PORT}:${PORT}" \
+        --env-file=/var/lib/toolbox/env/llm.env \
+        "${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:latest"'
+      StandardOutput=journal+console
+      StandardError=journal+console
+      Restart=on-failure
+      RestartSec=5s
+
+bootcmd:
+  # Create necessary directories and configure Docker auth
+  - mkdir -p /var/lib/docker/config
+  - mkdir -p /var/lib/toolbox/service
+  - mkdir -p /var/lib/toolbox/env
+  - mkdir -p /etc/systemd/system.conf.d
+  - DOCKER_CONFIG=/var/lib/docker/config docker-credential-gcr configure-docker --registries=us-central1-docker.pkg.dev
+  - ln -sf /var/lib/toolbox/service/install-gpu.service /etc/systemd/system/
+  - ln -sf /var/lib/toolbox/service/llm-service.service /etc/systemd/system/
+
+runcmd:
+  # Parse metadata and write environment files
+  - |
+    echo "Fetching environment variables..."
+    metadata_vars=$(curl -f -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/env-vars")
+    if [ $? -eq 0 ]; then
+        echo "$metadata_vars" | tr ',' '\n' > /var/lib/toolbox/env/llm.env
+    else
+        echo "Failed to fetch metadata!"
+        exit 1
+    fi
+  - systemctl daemon-reload
+  - systemctl restart docker
+  - systemctl start install-gpu.service
+  - systemctl start llm-service.service

@@ -1,0 +1,30 @@
+steps:
+  # Build step
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -o allexport
+        source .env
+        set +o allexport
+        echo "Building image: $$REGION-docker.pkg.dev/$$PROJECT_ID/$$REPO_NAME/$$IMAGE_NAME:latest"
+        docker build -t "$$REGION-docker.pkg.dev/$$PROJECT_ID/$$REPO_NAME/$$IMAGE_NAME:latest" .
+
+  # Push step
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -o allexport
+        source .env
+        set +o allexport
+        echo "Pushing image: $$REGION-docker.pkg.dev/$$PROJECT_ID/$$REPO_NAME/$$IMAGE_NAME:latest"
+        docker push "$$REGION-docker.pkg.dev/$$PROJECT_ID/$$REPO_NAME/$$IMAGE_NAME:latest"
+
+options:
+  machineType: 'E2_HIGHCPU_8'
+  diskSizeGb: 200
+
+timeout: '1200s'

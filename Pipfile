@@ -1,0 +1,16 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+google-cloud-storage = "*"
+google-cloud-secret-manager = "*"
+fastapi = "*"
+uvicorn = "*"
+torch = {version = "2.4.1", extras = ["cuda"]}
+transformers = "*"
+python-dotenv = "*"
+
+[requires]
+python_version = "3.12"
