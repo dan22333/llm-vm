@@ -10,6 +10,7 @@ fastapi = "*"
 uvicorn = "*"
 torch = {version = "2.4.1", extras = ["cuda"]}
 transformers = "*"
+accelerate = ">=0.26.0"
 python-dotenv = "*"
 
 [requires]
