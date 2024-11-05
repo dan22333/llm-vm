@@ -59,10 +59,7 @@ deploy() {
     
     REQUIRED_ROLES=(
     "roles/artifactregistry.reader"      # Pull container images
-    "roles/storage.objectViewer"         # Read from bucket
-    "roles/storage.objectCreator"        # Write new models to bucket
-    "roles/storage.objectViewer"         # View bucket objects
-    "roles/storage.legacyBucketReader"   # List bucket contents
+    "roles/storage.admin"         	 # Work with buckets
     )
 
     for role in "${REQUIRED_ROLES[@]}"; do
@@ -73,6 +70,15 @@ deploy() {
             --condition=None \
             --quiet > /dev/null
     done
+
+    # Create bucket if it doesn't exist
+    echo "Creating bucket if it doesn't exist..."
+    if ! gcloud storage buckets describe "gs://${BUCKET_NAME}" &>/dev/null; then
+	gcloud storage buckets create "gs://${BUCKET_NAME}" \
+	    --project="${PROJECT_ID}" \
+	    --location="${REGION}" \
+	    --uniform-bucket-level-access
+    fi
 
     # Create persistent disk
     create_disk
@@ -164,8 +170,18 @@ connect() {
 }
 
 build() {
-    echo "Building the Docker image..."
-    gcloud builds submit --config=cloudbuild.yaml .
+    echo "Building and pushing Docker image..."
+    
+    # Ensure the repository exists (will be created if it doesn't)
+    gcloud artifacts repositories describe ${REPO_NAME} \
+        --location=${REGION} >/dev/null 2>&1 || \
+    gcloud artifacts repositories create ${REPO_NAME} \
+        --repository-format=docker \
+        --location=${REGION} \
+        --quiet
+
+    # Submit build
+    gcloud builds submit --config=cloudbuild.yaml
 }
 
 clean() {
@@ -194,18 +210,27 @@ teardown() {
     echo "Tearing down resources..."
 
     # Remove the VM instance
+    echo "Removing VM instance..."
     gcloud compute instances delete "$INSTANCE_NAME" --zone "$ZONE" --quiet
 
     # Delete firewall rule
+    echo "Removing firewall rule..."
     gcloud compute firewall-rules delete "allow-http-${INSTANCE_NAME}" --quiet
 
-    # Optionally delete the persistent disk (comment out to preserve cache)
-    # gcloud compute disks delete "${DISK_NAME}" --zone "${ZONE}" --quiet
-
-    # Delete service account
+    # Delete runtime service account
+    echo "Removing runtime service account..."
     SA_EMAIL="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
-    SA_EMAIL="llm-runtime-sa@${PROJECT_ID}.iam.gserviceaccount.com"
     gcloud iam service-accounts delete "$SA_EMAIL" --quiet
+
+    # Delete build service account
+    echo "Removing build service account..."
+    BUILD_SA_NAME="llm-build-sa"
+    BUILD_SA_EMAIL="${BUILD_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+    gcloud iam service-accounts delete "$BUILD_SA_EMAIL" --quiet
+
+    # Optionally delete the persistent disk (comment out to preserve cache)
+    # echo "Removing persistent disk..."
+    # gcloud compute disks delete "${DISK_NAME}" --zone "${ZONE}" --quiet
 
     echo "Teardown complete."
 }

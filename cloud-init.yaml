@@ -89,9 +89,23 @@ bootcmd:
   - mkdir -p /var/lib/toolbox/service
   - mkdir -p /var/lib/toolbox/env
   - mkdir -p /etc/systemd/system.conf.d
+  - mkdir -p /etc/docker
 
-  # Configure docker credentials
-  - DOCKER_CONFIG=/var/lib/docker/config docker-credential-gcr configure-docker --registries=us-central1-docker.pkg.dev
+  # Create Docker config with credential helper
+  - |
+    REGION=$(curl -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/env-vars" | grep "^REGION=" | cut -d'=' -f2)
+    cat > /etc/docker/config.json << EOF
+    {
+      "credHelpers": {
+        "${REGION}-docker.pkg.dev": "gcr"
+      }
+    }
+    EOF
+
+  # Configure docker credentials with correct region
+  - |
+    REGION=$(curl -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/env-vars" | grep "^REGION=" | cut -d'=' -f2)
+    DOCKER_CONFIG=/var/lib/docker/config docker-credential-gcr configure-docker --registries=${REGION}-docker.pkg.dev
 
   # Create systemd service links
   - ln -sf /var/lib/toolbox/service/mount-cache.service /etc/systemd/system/
