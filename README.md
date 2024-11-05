@@ -36,8 +36,8 @@ Deploy and serve Large Language Models (LLMs) on Google Cloud Platform with auto
 1. **Clone and Configure**
    ```bash
    # Clone repository
-   git clone <repo-url>
-   cd gcp-llm-deployment
+   git clone git@github.com:dlops-io/llm-vm.git
+   cd llm-vm
 
    # Copy and edit environment configuration
    cp .env.template .env
@@ -141,7 +141,3 @@ Common issues and solutions:
 1. **GPU Not Available**: Check zone availability of GPU type
 2. **Authentication Errors**: Verify service account permissions
 3. **Model Download Failed**: Check HuggingFace token for gated models
-
-## License
-
-[Your License]
