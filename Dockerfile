@@ -25,17 +25,21 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
 
 # Set up working directory and copy application code
 WORKDIR /app
-COPY . .
+COPY Pipfile Pipfile.lock ./
 
 # Install dependencies
 RUN PIPENV_VENV_IN_PROJECT=1 pipenv install --deploy --ignore-pipfile
+
+# Copy application code (but not .env)
+COPY cli.py ./
 
 # Create cache directory
 RUN mkdir -p /mnt/disks/model-cache && chmod 777 /mnt/disks/model-cache
 
 # Health check
+## TODO: don't rely on hardcoded port
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${PORT}/health || exit 1
+    CMD curl -f http://localhost:8080/health || exit 1
 
 # Run the application
 CMD ["pipenv", "run", "uvicorn", "cli:app", "--host", "0.0.0.0", "--port", "8080"]

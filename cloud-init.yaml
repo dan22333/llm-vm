@@ -66,7 +66,6 @@ write_files:
       [Service]
       User=root
       Type=simple
-      Environment="DOCKER_CONFIG=/var/lib/docker/config"
       EnvironmentFile=/var/lib/toolbox/env/llm.env
       ExecStart=/bin/bash -c '/usr/bin/docker run --rm \
         --volume /var/lib/nvidia/lib64:/usr/local/nvidia/lib64 \
@@ -75,8 +74,8 @@ write_files:
         --device /dev/nvidia-uvm:/dev/nvidia-uvm \
         --device /dev/nvidiactl:/dev/nvidiactl \
         --volume /mnt/disks/model-cache:/mnt/disks/model-cache \
+        --volume /var/lib/toolbox/env/llm.env:/app/.env:ro \
         -p "${PORT}:${PORT}" \
-        --env-file=/var/lib/toolbox/env/llm.env \
         "${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:latest"'
       StandardOutput=journal+console
       StandardError=journal+console
