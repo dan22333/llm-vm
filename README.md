@@ -2,6 +2,8 @@
 
 Deploy and serve Large Language Models (LLMs) on Google Cloud Platform with automatic caching, GPU acceleration, and a REST API interface. This project provides a complete setup for running Hugging Face models as a service, with options for both public and gated models.
 
+**Note:** See known bugs at the bottom 🪲
+
 ## Features
 - 🚀 Fast deployment with single-command setup
 - 💾 Multi-level caching (Local Disk → GCS Bucket → Hugging Face)
@@ -141,3 +143,8 @@ Common issues and solutions:
 1. **GPU Not Available**: Check zone availability of GPU type
 2. **Authentication Errors**: Verify service account permissions
 3. **Model Download Failed**: Check HuggingFace token for gated models
+
+## Known Bugs 🪲
+The following are some implementation issues to be fixed in the near future.
+- Issues authenticating with hugging_face token for gated models
+- Model fails to load from bucket (but loading from Huggingface and saving to bucket works fine)
