@@ -1,94 +1,147 @@
-
 # GCP LLM Deployment Project
 
-This repository contains all the necessary files and instructions to deploy a Large Language Model (LLM) service on Google Cloud Platform (GCP). This setup includes provisioning cloud resources, handling authentication, caching, and managing the model deployment using Docker and FastAPI.
+Deploy and serve Large Language Models (LLMs) on Google Cloud Platform with automatic caching, GPU acceleration, and a REST API interface. This project provides a complete setup for running Hugging Face models as a service, with options for both public and gated models.
 
-## Repository Structure
-
-- **Dockerfile**: Specifies the Docker environment used to run the LLM service, including dependencies and setup.
-- **cloud-init.yaml**: Configures the VM on GCP, setting up necessary environment configurations and installing essential packages upon instance startup.
-- **cloudbuild.yaml**: GCP Cloud Build configuration file. This automates building the Docker image and pushing it to Google Container Registry.
-- **Pipfile & Pipfile.lock**: Define Python dependencies for the project. `Pipfile` manages packages, and `Pipfile.lock` ensures consistency across installations.
-- **cli.py**: The main FastAPI server code. It loads the LLM model, handles requests, and manages interactions with Hugging Face and Google Cloud Storage.
-- **manage.sh**: script with functions for building & pushing the container image as well as deploying, connecting via SSH, and tearing down the infrastructure on GCP.
-- **test_llm.sh**: Send a prompt to the LLM's endpoint.
-- **.env**: Contains environment variables for project configuration, including sensitive information like API keys. This file should be kept private.
+## Features
+- 🚀 Fast deployment with single-command setup
+- 💾 Multi-level caching (Local Disk → GCS Bucket → Hugging Face)
+- 🔒 Secure secrets management for gated models
+- 🎮 REST API interface with FastAPI
+- 🖥️ GPU acceleration with NVIDIA T4/V100/A100
+- 🐳 Containerized deployment with Docker
+- ⚡ Interactive testing interface
 
 ## Prerequisites
 
-1. **Google Cloud Platform**:
-   - Google Cloud project with billing enabled.
-   - Google Cloud Storage and Secret Manager API enabled.
-   - Service account with sufficient permissions (Storage Admin, Secret Manager Accessor).
-2. **Google Cloud CLI**: For `gloud` commands for interacting with GCP.
-3. **Docker**: Installed locally to build and test the container.
-4. **Pipenv**: For dependency management.
+1. **Google Cloud Platform Account**
+   - Active project with billing enabled
+   - APIs enabled:
+     - Compute Engine
+     - Cloud Build
+     - Artifact Registry
+     - Secret Manager
+     - Cloud Storage
 
-## Setup Instructions
+2. **Local Development Environment**
+   - Google Cloud CLI (`gcloud`) installed and initialized
+   - Docker installed (for local testing)
+   - Python 3.12+ with pipenv
 
-### 1. Environment Variables
+3. **Optional: Hugging Face Account**
+   - Required only for gated models (e.g., Llama)
+   - Access token saved in `../secrets/huggingface_token`
 
-Set up the `.env` file in the root directory with the following keys:
+## Quick Start
 
-```plaintext
-PROJECT_ID=ac215-project
-MODEL_ID="meta-llama/Llama-3.2-3B-Instruct" # Any LLM from Huggingface
-#MODEL_ID=""
-BUCKET_NAME=huggingface-llm
-REGION=us-west4 # Region and zone must have your GPU/Machine available
-ZONE=us-west4-b
-INSTANCE_NAME=llama3-model-instance
-DISK_NAME=model-cache-disk
-DISK_SIZE=200GB
-MACHINE_TYPE=n1-standard-1
-GPU_TYPE=nvidia-tesla-t4
-REPO_NAME=llama3-repo
-IMAGE_NAME=llama3-model
-SA_NAME=llm-runtime-sa
-PORT=8080
+1. **Clone and Configure**
+   ```bash
+   # Clone repository
+   git clone <repo-url>
+   cd gcp-llm-deployment
+
+   # Copy and edit environment configuration
+   cp .env.template .env
+   # Edit .env with your desired configuration
+   ```
+
+2. **Build and Deploy**
+   ```bash
+   # Build container and push to Artifact Registry
+   ./manage.sh build
+
+   # Deploy VM with GPU and start service
+   ./manage.sh deploy
+   ```
+
+3. **Test the Service**
+   ```bash
+   # Interactive testing interface
+   ./test_llm.sh
+   ```
+
+## Configuration Guide
+
+### Environment Variables (.env)
+```bash
+# Required Configuration
+PROJECT_ID="your-gcp-project"     # Your GCP project ID
+MODEL_ID="HuggingFaceTB/SmolLM2-1.7B-Instruct"  # Model to deploy
+
+# Optional Configuration (defaults shown)
+REGION="us-west4"                 # Must have GPU availability
+ZONE="us-west4-b"                 # Specific zone in region
+MACHINE_TYPE="n1-standard-1"      # VM instance type
+GPU_TYPE="nvidia-tesla-t4"        # GPU accelerator type
+PORT=8080                         # Service port
 ```
 
-**Note:** If you want to use a model like Llama3 which requires aproved access, you must first create a Huggingface account, aggree to the model's terms of service, wait for approval, and finally add your access token to `../secrets/huggingface_token`
+### Model Selection
+- **Public Models**: Use any public Hugging Face model (e.g., `"HuggingFaceTB/SmolLM2-1.7B-Instruct"`)
+- **Gated Models**: For models requiring authentication:
+  1. Accept model terms on Hugging Face website
+  2. Get access token from Hugging Face
+  3. Save token to `../secrets/huggingface_token`
 
-There are many other models such as `'HuggingFaceTB/SmolLM2-1.7B-Instruct'` which you can pull without any specal permissions.
+## Architecture
 
-### 2. Build & Push Docker Image
+### Caching Strategy
+1. First checks local disk cache
+2. If not found, checks GCS bucket
+3. Finally, downloads from Hugging Face
+4. Automatically uploads to GCS for future use
 
-To build the Docker image with Google Cloud Build, and psuh to the Artifact Registry:
+### Components
+- **FastAPI Server**: Handles HTTP requests and model interaction
+- **GPU Acceleration**: Automatic NVIDIA driver setup
+- **Cloud Storage**: Persistent model cache
+- **Docker Container**: Isolated runtime environment
+
+## Usage Examples
+
+1. **Basic Generation**
+   ```bash
+   curl -X POST "http://<VM-IP>:8080/generate/" \
+     -H "Content-Type: application/json" \
+     -d '{"text": "What is machine learning?", "max_length": 100}'
+   ```
+
+2. **Interactive Session**
+   ```bash
+   ./test_llm.sh
+   # Type prompts and get responses
+   # Type 'q' to quit
+   ```
+
+## Management Commands
 
 ```bash
-./manage build
+./manage.sh build              # Build and push container
+./manage.sh deploy            # Create VM and start service
+./manage.sh connect           # SSH into VM
+./manage.sh teardown          # Remove all resources
 ```
 
-### 3. Deploying on GCP
+## Monitoring and Maintenance
 
-**Provision Resources**:
-To create a GCP VM running the image in the AR use:
-`./manage deploy`
-   
-This makes use of `cloud-init.yaml` for configuring the base VM on startup, including the installation of NVIDIA drivers and running the container with appropriate flags.
+Check service status:
+```bash
+# SSH into VM
+./manage.sh connect
 
-### 4. Running the Service
+# View service logs
+sudo journalctl -u llm-service -f
 
-After the deployment is completed, the FastAPI server will be accessible. The endpoint `/generate/` accepts POST requests with a `text` field to generate responses.
-
-Example request:
-
-```json
-{
-  "text": "Hello, world!",
-  "max_length": 100
-}
+# Check GPU status
+nvidia-smi
 ```
-You can use the provided `./test_llm` script to send the endpoint a prompt.
-**Note:** The current CLI implementation only loads the model upon the first received prompt...
 
-## CLI Usage
+## Troubleshooting
 
-The `cli.py` file contains the core FastAPI app with endpoints for interacting with the model. Key endpoints include:
+Common issues and solutions:
+1. **GPU Not Available**: Check zone availability of GPU type
+2. **Authentication Errors**: Verify service account permissions
+3. **Model Download Failed**: Check HuggingFace token for gated models
 
-- `/generate/`: Generates text based on the input prompt. Use this endpoint to interact with the model.
+## License
 
-### Caching and Model Management
-
-`cli.py` includes functionality for managing the LLM model cache. The model is stored in GCP and fetched as needed to optimize resource usage.
+[Your License]
